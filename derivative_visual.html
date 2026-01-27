@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculus Applet - Power Logic Final Fix</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.8.0/math.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f2f5;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .applet-container {
+            width: 850px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .panel {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        }
+
+        .function-row {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 15px;
+            align-items: center;
+        }
+
+        input[type="text"].func-input {
+            flex-grow: 1;
+            font-family: 'Courier New', monospace;
+            font-size: 1.2em;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            outline: none;
+        }
+
+        .scale-grid {
+            display: grid;
+            grid-template-columns: auto 1fr 1fr auto;
+            gap: 25px;
+            align-items: center;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #eee;
+        }
+
+        .scale-box { display: flex; flex-direction: column; gap: 8px; }
+
+        .input-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.9em;
+            color: #444;
+        }
+
+        input[type="number"] {
+            width: 60px;
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            text-align: center;
+        }
+
+        button {
+            padding: 10px 22px;
+            border: none;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            background: #4a90e2;
+            color: white;
+        }
+
+        button:hover { background: #357abd; }
+
+        .canvas-wrapper {
+            position: relative;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .label-tag {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(255,255,255,0.9);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-style: italic;
+        }
+
+        .data-tag {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            font-family: 'Courier New', monospace;
+            background: rgba(255,255,255,0.9);
+            padding: 3px 8px;
+            border-radius: 4px;
+            color: #d63031;
+            font-weight: bold;
+        }
+
+        input[type="range"] { width: 100%; margin: 10px 0; cursor: pointer; }
+        .disabled { opacity: 0.5; pointer-events: none; }
+    </style>
+</head>
+<body>
+
+<div class="applet-container">
+    <div class="panel">
+        <div class="function-row">
+            <span style="font-size: 1.2em; font-weight: bold; font-style: italic;">f(x) =</span>
+            <input type="text" id="funcInput" class="func-input" value="sin(x)+1.5sin(2x)">
+            <button onclick="startAnimation()">Animate</button>
+        </div>
+
+        <div class="scale-grid">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <input type="checkbox" id="chkAuto" onchange="toggleAuto()">
+                <label for="chkAuto" style="font-weight: bold; cursor:pointer;">Auto Scale</label>
+            </div>
+
+            <div class="scale-box" id="box_f">
+                <span style="font-weight: bold; color: #4a90e2;">Graph f(x)</span>
+                <div class="input-row"><label>X</label> <input type="number" id="f_xMin" value="-9"> to <input type="number" id="f_xMax" value="9"></div>
+                <div class="input-row"><label>Y</label> <input type="number" id="f_yMin" value="-3"> to <input type="number" id="f_yMax" value="3"></div>
+            </div>
+
+            <div class="scale-box" id="box_df">
+                <span style="font-weight: bold; color: #2ecc71;">Graph f'(x)</span>
+                <div class="input-row"><label>X</label> <input type="number" id="df_xMin" value="-9"> to <input type="number" id="df_xMax" value="9"></div>
+                <div class="input-row"><label>Y</label> <input type="number" id="df_yMin" value="-5"> to <input type="number" id="df_yMax" value="5"></div>
+            </div>
+
+            <button onclick="handleManualUpdate()">Update</button>
+        </div>
+    </div>
+
+    <div class="canvas-wrapper">
+        <div class="label-tag">f(x)</div>
+        <div id="fx-readout" class="data-tag"></div>
+        <canvas id="graphMain" width="850" height="350"></canvas>
+    </div>
+
+    <input type="range" id="xSlider" step="any">
+
+    <div class="canvas-wrapper">
+        <div class="label-tag">f'(x)</div>
+        <div id="dfx-readout" class="data-tag"></div>
+        <canvas id="graphDerivative" width="850" height="250"></canvas>
+    </div>
+</div>
+
+<script>
+    const canvasMain = document.getElementById('graphMain'), ctxMain = canvasMain.getContext('2d');
+    const canvasDeriv = document.getElementById('graphDerivative'), ctxDeriv = canvasDeriv.getContext('2d');
+    const slider = document.getElementById('xSlider'), funcInput = document.getElementById('funcInput'), chkAuto = document.getElementById('chkAuto');
+
+    const inputs = {
+        f_xMin: document.getElementById('f_xMin'), f_xMax: document.getElementById('f_xMax'),
+        f_yMin: document.getElementById('f_yMin'), f_yMax: document.getElementById('f_yMax'),
+        df_xMin: document.getElementById('df_xMin'), df_xMax: document.getElementById('df_xMax'),
+        df_yMin: document.getElementById('df_yMin'), df_yMax: document.getElementById('df_yMax')
+    };
+
+    let fBounds = { xMin: -9, xMax: 9, yMin: -1, yMax: 5 };
+    let dfBounds = { xMin: -9, xMax: 9, yMin: -5, yMax: 5 };
+    let animationId = null, traceData = [], isAnimating = false, parsedFunc = null, parsedDeriv = null, lastX = -9;
+
+    function safeEval(node, scope) {
+        try {
+            // Force Math.js to use real results for powers/roots
+            const result = node.evaluate(scope);
+            return (typeof result === 'object' && result.re !== undefined) ? result.re : result;
+        } catch (e) { return NaN; }
+    }
+
+    function toScreenX(x, bounds, width) { return (x - bounds.xMin) / (bounds.xMax - bounds.xMin) * width; }
+    function toScreenY(y, bounds, height) { return height - (y - bounds.yMin) / (bounds.yMax - bounds.yMin) * height; }
+
+    function getNiceStep(range) {
+        const roughStep = range / 8;
+        const magnitude = Math.pow(10, Math.floor(Math.log10(roughStep)));
+        const normalized = roughStep / magnitude;
+        let step = (normalized < 1.5) ? 1 : (normalized < 3) ? 2 : (normalized < 7) ? 5 : 10;
+        return step * magnitude;
+    }
+
+    function toggleAuto() {
+        const isAuto = chkAuto.checked;
+        document.getElementById('box_f').classList.toggle('disabled', isAuto);
+        document.getElementById('box_df').classList.toggle('disabled', isAuto);
+        if(isAuto) { calculateBounds(); update(); }
+    }
+
+    function handleManualUpdate() {
+        calculateBounds();
+        if(!chkAuto.checked) {
+            fBounds = { xMin: parseFloat(inputs.f_xMin.value), xMax: parseFloat(inputs.f_xMax.value), yMin: parseFloat(inputs.f_yMin.value), yMax: parseFloat(inputs.f_yMax.value) };
+            dfBounds = { xMin: parseFloat(inputs.df_xMin.value), xMax: parseFloat(inputs.df_xMax.value), yMin: parseFloat(inputs.df_yMin.value), yMax: parseFloat(inputs.df_yMax.value) };
+        }
+        slider.min = fBounds.xMin; slider.max = fBounds.xMax;
+        slider.value = fBounds.xMin; lastX = fBounds.xMin;
+        traceData = []; update();
+    }
+
+    function calculateBounds() {
+        try {
+            // For x^(2/3) types, we swap out the direct power for a real-only version
+            let rawStr = funcInput.value.replace(/x\^(\([^)]+\)|[0-9./]+)/g, "pow(abs(x), $1)");
+            const node = math.parse(rawStr);
+            const derivNode = math.derivative(node, 'x');
+            
+            parsedFunc = (xVal) => safeEval(node, {x: xVal});
+            parsedDeriv = (xVal) => safeEval(derivNode, {x: xVal});
+            
+            if (chkAuto.checked) {
+                let lYMin = Infinity, lYMax = -Infinity, lDYMin = Infinity, lDYMax = -Infinity;
+                for(let i=0; i<=300; i++) {
+                    let x = fBounds.xMin + (i * (fBounds.xMax - fBounds.xMin) / 300);
+                    let y = parsedFunc(x), dy = parsedDeriv(x);
+                    if (isFinite(y)) { lYMin = Math.min(lYMin, y); lYMax = Math.max(lYMax, y); }
+                    if (isFinite(dy)) { lDYMin = Math.min(lDYMin, dy); lDYMax = Math.max(lDYMax, dy); }
+                }
+                const pY = (lYMax - lYMin) * 0.2 || 1;
+                const pDY = (lDYMax - lDYMin) * 0.2 || 1;
+                fBounds.yMin = lYMin - pY; fBounds.yMax = lYMax + pY;
+                dfBounds.yMin = lDYMin - pDY; dfBounds.yMax = lDYMax + pDY;
+                inputs.f_yMin.value = fBounds.yMin.toFixed(2); inputs.f_yMax.value = fBounds.yMax.toFixed(2);
+                inputs.df_yMin.value = dfBounds.yMin.toFixed(2); inputs.df_yMax.value = dfBounds.yMax.toFixed(2);
+            }
+        } catch (e) { console.error(e); }
+    }
+
+    function drawGrid(ctx, w, h, bounds) {
+        ctx.clearRect(0,0,w,h);
+        const xStep = getNiceStep(bounds.xMax - bounds.xMin), yStep = getNiceStep(bounds.yMax - bounds.yMin);
+        ctx.font = '10px Arial'; ctx.fillStyle = '#bbb'; ctx.lineWidth = 0.5;
+        for(let v = Math.ceil(bounds.xMin/xStep)*xStep; v <= bounds.xMax; v += xStep) {
+            let x = toScreenX(v, bounds, w); ctx.strokeStyle = '#f0f0f0';
+            ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,h); ctx.stroke();
+            ctx.fillText(v.toFixed(1), x + 2, h - 5);
+        }
+        for(let v = Math.ceil(bounds.yMin/yStep)*yStep; v <= bounds.yMax; v += yStep) {
+            let y = toScreenY(v, bounds, h); ctx.strokeStyle = '#f0f0f0';
+            ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.stroke();
+            ctx.fillText(v.toFixed(1), 5, y - 2);
+        }
+        ctx.strokeStyle = '#ddd'; ctx.lineWidth = 1.2; ctx.beginPath();
+        let zX = toScreenX(0, bounds, w), zY = toScreenY(0, bounds, h);
+        if(zX >=0 && zX <= w) { ctx.moveTo(zX,0); ctx.lineTo(zX,h); }
+        if(zY >=0 && zY <= h) { ctx.moveTo(0,zY); ctx.lineTo(w,zY); }
+        ctx.stroke();
+    }
+
+    function update() {
+        if (!parsedFunc) return;
+        const curX = parseFloat(slider.value), curY = parsedFunc(curX), curM = parsedDeriv(curX);
+        document.getElementById('fx-readout').innerText = `x: ${curX.toFixed(3)}, y: ${curY.toFixed(3)}`;
+        document.getElementById('dfx-readout').innerText = `Slope: ${curM.toFixed(3)}`;
+
+        if (curX > lastX) {
+            const steps = Math.max(1, Math.ceil(toScreenX(curX, dfBounds, canvasDeriv.width) - toScreenX(lastX, dfBounds, canvasDeriv.width)));
+            for(let i=1; i<=steps; i++) {
+                let interX = lastX + (i * (curX - lastX) / steps);
+                traceData.push({x: interX, y: parsedDeriv(interX)});
+            }
+        } else if (curX < lastX) traceData = traceData.filter(p => p.x <= curX);
+        lastX = curX;
+
+        drawGrid(ctxMain, canvasMain.width, canvasMain.height, fBounds);
+        ctxMain.strokeStyle = '#4a90e2'; ctxMain.lineWidth = 3; ctxMain.beginPath();
+        let firstF = true;
+        for(let i=0; i<=canvasMain.width; i++) {
+            let lx = fBounds.xMin + (i/canvasMain.width)*(fBounds.xMax-fBounds.xMin);
+            let ly = parsedFunc(lx);
+            if (!isNaN(ly) && isFinite(ly)) {
+                let py = toScreenY(ly, fBounds, canvasMain.height);
+                if(firstF) { ctxMain.moveTo(i, py); firstF = false; }
+                else ctxMain.lineTo(i, py);
+            } else firstF = true;
+        }
+        ctxMain.stroke();
+
+        const xM = toScreenX(curX - 0.5, fBounds, canvasMain.width), xP = toScreenX(curX + 0.5, fBounds, canvasMain.width);
+        const yS = toScreenY(curM * (-0.5) + curY, fBounds, canvasMain.height), yE = toScreenY(curM * (0.5) + curY, fBounds, canvasMain.height);
+        ctxMain.setLineDash([4, 2]); ctxMain.strokeStyle = '#888';
+        ctxMain.beginPath(); ctxMain.moveTo(xM, yS); ctxMain.lineTo(xP, yS); ctxMain.stroke();
+        ctxMain.beginPath(); ctxMain.moveTo(xP, yS); ctxMain.lineTo(xP, yE); ctxMain.stroke();
+        ctxMain.setLineDash([]); ctxMain.strokeStyle = '#d63031'; ctxMain.lineWidth = 2.5;
+        ctxMain.beginPath(); ctxMain.moveTo(xM, yS); ctxMain.lineTo(xP, yE); ctxMain.stroke();
+        ctxMain.fillStyle = '#d63031'; ctxMain.beginPath(); ctxMain.arc(toScreenX(curX, fBounds, canvasMain.width), toScreenY(curY, fBounds, canvasMain.height), 5, 0, 7); ctxMain.fill();
+
+        drawGrid(ctxDeriv, canvasDeriv.width, canvasDeriv.height, dfBounds);
+        ctxDeriv.strokeStyle = '#2ecc71'; ctxDeriv.lineWidth = 2.5; ctxDeriv.beginPath();
+        let firstD = true;
+        traceData.forEach(p => { 
+            if(p.x >= dfBounds.xMin && p.x <= dfBounds.xMax && !isNaN(p.y)) {
+                let sx = toScreenX(p.x, dfBounds, canvasDeriv.width), sy = toScreenY(p.y, dfBounds, canvasDeriv.height);
+                if(firstD) { ctxDeriv.moveTo(sx, sy); firstD = false; } else ctxDeriv.lineTo(sx, sy);
+            }
+        });
+        ctxDeriv.stroke();
+        if(!isNaN(curM)) {
+            ctxDeriv.fillStyle = '#27ae60'; ctxDeriv.beginPath(); ctxDeriv.arc(toScreenX(curX, dfBounds, canvasDeriv.width), toScreenY(curM, dfBounds, canvasDeriv.height), 5, 0, 7); ctxDeriv.fill();
+        }
+    }
+
+    function animateStep() {
+        if (!isAnimating) return;
+        let val = parseFloat(slider.value);
+        if (val >= fBounds.xMax) { isAnimating = false; return; }
+        slider.value = (val + (fBounds.xMax - fBounds.xMin) / 500).toString();
+        update(); animationId = requestAnimationFrame(animateStep);
+    }
+
+    function startAnimation() { isAnimating = false; cancelAnimationFrame(animationId); slider.value = fBounds.xMin; lastX = fBounds.xMin; traceData = []; isAnimating = true; animateStep(); }
+    funcInput.addEventListener('keydown', (e) => { if(e.key === 'Enter') handleManualUpdate(); });
+    slider.addEventListener('input', () => { isAnimating = false; update(); });
+
+    handleManualUpdate();
+</script>
+</body>
+</html>
