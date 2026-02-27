@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Related Rates: Deflating Balloon</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f8ff;
+            color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            background-color: white;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            max-width: 500px;
+            width: 100%;
+            text-align: center;
+        }
+        h1 {
+            color: #2c3e50;
+            margin-top: 0;
+        }
+        .balloon-img {
+            width: 100%;
+            height: 250px;
+            object-fit: cover;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+        }
+        p {
+            line-height: 1.6;
+            color: #555;
+            margin-bottom: 25px;
+        }
+        .input-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+        label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #2980b9;
+        }
+        input[type="number"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #bdc3c7;
+            border-radius: 8px;
+            font-size: 16px;
+            box-sizing: border-box;
+            transition: border-color 0.3s;
+        }
+        input[type="number"]:focus {
+            border-color: #3498db;
+            outline: none;
+        }
+        button {
+            background-color: #e74c3c;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            width: 100%;
+            transition: background-color 0.3s, transform 0.1s;
+        }
+        button:hover {
+            background-color: #c0392b;
+        }
+        button:active {
+            transform: scale(0.98);
+        }
+        #result {
+            margin-top: 25px;
+            padding: 15px;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 1.1em;
+            display: none;
+        }
+        .correct {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+            display: block !important;
+        }
+        .wrong {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            display: block !important;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>The Deflating Balloon Challenge</h1>
+        
+        <p>Enter the radius you are using and your measured volume rate below, followed by your calculated rate of change for the radius. Let's see if your related rates math checks out!</p>
+
+        <div class="input-group">
+            <label for="radius">Radius (r):</label>
+            <input type="number" id="radius" step="any" min="0" placeholder="e.g., 5">
+        </div>
+
+        <div class="input-group">
+            <label for="dvdt">Measured Rate of Volume Change (dV/dt):</label>
+            <input type="number" id="dvdt" step="any" placeholder="e.g., -10">
+        </div>
+
+        <div class="input-group">
+            <label for="drdt">Your Calculated Rate of Radius Change (dr/dt):</label>
+            <input type="number" id="drdt" step="any" placeholder="Enter your answer">
+        </div>
+
+        <button onclick="checkAnswer()">Check My Answer</button>
+
+        <div id="result"></div>
+    </div>
+
+    <script>
+        function checkAnswer() {
+            const r = parseFloat(document.getElementById('radius').value);
+            const dvdt = parseFloat(document.getElementById('dvdt').value);
+            const userDrdt = parseFloat(document.getElementById('drdt').value);
+            const resultDiv = document.getElementById('result');
+
+            // 1. Check if any fields are empty or non-numeric
+            if (isNaN(r) || isNaN(dvdt) || isNaN(userDrdt)) {
+                resultDiv.innerHTML = "⚠️ Please enter valid numbers in all three fields.";
+                resultDiv.className = "wrong";
+                return;
+            }
+
+            // 2. Validate that radius is not negative
+            if (r < 0) {
+                resultDiv.innerHTML = "⚠️ A balloon cannot have a negative radius.";
+                resultDiv.className = "wrong";
+                return;
+            }
+
+            // 3. Prevent division by zero if they enter exactly 0 for the radius
+            if (r === 0) {
+                resultDiv.innerHTML = "⚠️ The radius must be greater than zero.";
+                resultDiv.className = "wrong";
+                return;
+            }
+
+            // 4. Check for positive rates (deflating means rates should be negative)
+            if (dvdt > 0 || userDrdt > 0) {
+                let hintText = "⚠️ Hint: ";
+                
+                if (dvdt > 0 && userDrdt > 0) {
+                    hintText += "Are our volume and radius increasing or decreasing?";
+                } else if (dvdt > 0) {
+                    hintText += "Is our volume increasing or decreasing?";
+                } else if (userDrdt > 0) {
+                    hintText += "Is our radius increasing or decreasing?";
+                }
+                
+                resultDiv.innerHTML = hintText;
+                resultDiv.className = "wrong";
+                return; // Stop the check here so they fix the signs first
+            }
+
+            // 5. Calculate the actual dr/dt
+            const actualDrdt = dvdt / (4 * Math.PI * Math.pow(r, 2));
+
+            // Use a 5% margin of error to account for rounding pi or intermediate steps
+            const marginOfError = Math.abs(actualDrdt * 0.05);
+            const absoluteDifference = Math.abs(actualDrdt - userDrdt);
+
+            // Add a flat 0.01 tolerance for extremely small numbers
+            if (absoluteDifference <= marginOfError || absoluteDifference <= 0.01) {
+                resultDiv.innerHTML = "🎉 Spot on! Great job with your related rates calculation.";
+                resultDiv.className = "correct";
+            } else {
+                resultDiv.innerHTML = "❌ Not quite right. Double-check your derivative and try again!";
+                resultDiv.className = "wrong";
+            }
+        }
+    </script>
+
+</body>
+</html>
