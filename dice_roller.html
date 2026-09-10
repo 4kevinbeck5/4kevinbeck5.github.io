@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Law of Large Numbers: Dice Simulator</title>
+    <!-- Import Chart.js from a CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            text-align: center;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 2rem;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        input {
+            padding: 0.5rem;
+            font-size: 1rem;
+            width: 150px;
+            margin-right: 10px;
+        }
+        button {
+            padding: 0.5rem 1.5rem;
+            font-size: 1rem;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .canvas-container {
+            margin-top: 2rem;
+            position: relative;
+            height: 400px;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Dice Roller Simulator</h1>
+        <p>Enter the number of times to roll a 6-sided die. Watch how the distribution changes as the number of rolls gets larger!</p>
+        
+        <div>
+            <input type="number" id="rollCount" placeholder="e.g., 1000" min="1" value="100">
+            <button onclick="simulateRolls()">Roll Dice</button>
+        </div>
+
+        <div class="canvas-container">
+            <canvas id="resultsChart"></canvas>
+        </div>
+    </div>
+
+    <script>
+        let chartInstance = null; // Keep track of the chart so we can update it
+
+        function simulateRolls() {
+            // 1. Get the number of rolls from the input
+            const numRolls = parseInt(document.getElementById('rollCount').value);
+            
+            if (isNaN(numRolls) || numRolls <= 0) {
+                alert("Please enter a valid number greater than 0.");
+                return;
+            }
+
+            // 2. Initialize an array to hold the count for faces 1 through 6
+            const frequencies = [0, 0, 0, 0, 0, 0];
+
+            // 3. Roll the die 'numRolls' times
+            for (let i = 0; i < numRolls; i++) {
+                const rollIndex = Math.floor(Math.random() * 6);
+                frequencies[rollIndex]++;
+            }
+
+            // 4. Draw the chart with the results
+            drawChart(frequencies, numRolls);
+        }
+
+        function drawChart(frequencies, totalRolls) {
+            const ctx = document.getElementById('resultsChart').getContext('2d');
+            
+            // Calculate the expected number of rolls for a perfectly fair die
+            const expectedCount = totalRolls / 6;
+            const expectedData = Array(6).fill(expectedCount);
+
+            // If a chart already exists, destroy it so we can draw a fresh one
+            if (chartInstance) {
+                chartInstance.destroy();
+            }
+
+            // Create the new chart
+            chartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    // *** THIS IS THE LINE THAT CHANGED ***
+                    labels: ['1', '2', '3', '4', '5', '6'],
+                    datasets: [
+                        {
+                            label: 'Actual Rolls',
+                            data: frequencies,
+                            backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                            borderColor: 'rgba(54, 162, 235, 1)',
+                            borderWidth: 1,
+                            order: 2
+                        },
+                        {
+                            label: 'Expected Probability (Perfect Distribution)',
+                            data: expectedData,
+                            type: 'line',
+                            fill: false,
+                            borderColor: 'rgba(255, 99, 132, 1)',
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            order: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Dice Result' // Added a title for the x-axis to make it clear what the numbers are
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Number of Times Rolled'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Generate a starting chart when the page loads
+        window.onload = simulateRolls;
+    </script>
+</body>
+</html>
